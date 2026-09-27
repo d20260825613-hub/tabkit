@@ -1,0 +1,18 @@
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local scratch files
+*.tabkit.json
+tabkit-report.json
+
+coverage/
+.nyc_output/
+
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp

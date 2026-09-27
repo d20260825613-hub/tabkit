@@ -1,0 +1,132 @@
+# 测试矩阵：三个操作系统 × 四个 Node 版本。
+#
+# tabkit 的核心是文本解析，而文本在不同平台上长得不一样：CRLF 与 LF、控制台代码页
+# （中文 Windows 是 GBK）、非 ASCII 列名。这些在 Windows 上对不代表 Linux 上对。
+#
+# 除单元测试外还跑两件这个项目特有的事：
+#   * e2e —— 用真实文件跑真实 CLI，断言 stdout；单元测试覆盖不到的"选项组合"在这里
+#   * 打包安装后运行 —— 覆盖 bin 路径、files 白名单、shebang 权限这些只有装过才知道的问题
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }} / node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['18.17', '20', '22', '24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Assert zero runtime dependencies
+        shell: bash
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const runtime = Object.keys(pkg.dependencies ?? {});
+            if (runtime.length > 0) {
+              console.error('runtime dependencies found:', runtime.join(', '));
+              process.exit(1);
+            }
+            console.log('zero runtime dependencies: ok');
+          "
+
+      - name: Syntax check
+        run: node --check bin/tabkit.js
+
+      - name: Unit tests
+        run: npm test
+
+      - name: End-to-end checks against the real CLI
+        run: npm run e2e
+
+      - name: CRLF input parses the same as LF
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A file written on Windows must not put a stray CR in the last column.
+          # printf rather than echo -e so the CRLF is exact on every platform.
+          printf 'a,b\r\n1,2\r\n3,4\r\n' > crlf.csv
+          out=$(node bin/tabkit.js cat crlf.csv --to json --quiet)
+          node -e "
+            const rows = JSON.parse(process.argv[1]);
+            if (rows.length !== 2) { console.error('row count', rows.length); process.exit(1); }
+            if (rows[0].b !== '2') { console.error('CR leaked into a value:', JSON.stringify(rows[0].b)); process.exit(1); }
+            console.log('CRLF handled cleanly');
+          " "$out"
+
+      - name: Non-ASCII column names survive a round trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '城市,人口\n北京,2189\n上海,2487\n' > cjk.csv
+          node bin/tabkit.js cat cjk.csv --to csv --quiet > round.csv
+          node -e "
+            const fs = require('fs');
+            const text = fs.readFileSync('round.csv', 'utf8');
+            if (!text.includes('城市') || !text.includes('北京')) {
+              console.error('non-ASCII data was mangled:', JSON.stringify(text));
+              process.exit(1);
+            }
+            console.log('CJK round trip ok');
+          "
+
+  package:
+    name: packaged install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install from the packed tarball and run it
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          sandbox=$(mktemp -d)
+          npm pack --pack-destination "$sandbox" > /dev/null
+          npm install --global --prefix "$sandbox/prefix" --cache "$sandbox/cache" \
+            --no-audit --no-fund --loglevel error "$sandbox/$name-$version.tgz"
+          # npm puts the command in a different place per platform
+          bin="$sandbox/prefix/bin/$name"
+          [ -x "$bin" ] || bin="$sandbox/prefix/$name.cmd"
+          [ -e "$bin" ] || bin="$sandbox/prefix/$name"
+          echo "installed command: $bin"
+          "$bin" --version
+          "$bin" help > /dev/null
+          printf 'id,name\n1,alice\n2,bob\n' > "$sandbox/data.csv"
+          "$bin" peek "$sandbox/data.csv" --json --quiet > "$sandbox/profile.json"
+          node -e "
+            const p = JSON.parse(require('fs').readFileSync('$sandbox/profile.json', 'utf8'));
+            if (p.rows !== 2) { console.error('installed peek wrong:', p.rows); process.exit(1); }
+            console.log('installed command works:', p.columns.length, 'columns');
+          "
+          "$bin" query 'id > 1' "$sandbox/data.csv" --to csv --quiet | grep -q 'bob'
+          echo 'installed query works'
+          rm -rf "$sandbox"

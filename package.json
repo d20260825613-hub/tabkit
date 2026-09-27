@@ -1,0 +1,56 @@
+{
+  "name": "tabkit",
+  "version": "0.1.0",
+  "description": "Zero-dependency CLI for the tables that pile up in real work: peek at a CSV's columns, convert between CSV/TSV/JSON/JSONL/Markdown, and filter rows with a small safe expression language.",
+  "keywords": [
+    "csv",
+    "tsv",
+    "json",
+    "jsonl",
+    "convert",
+    "query",
+    "filter",
+    "cli",
+    "data",
+    "table"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "tabkit": "bin/tabkit.js"
+  },
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "start": "node bin/tabkit.js",
+    "test": "node scripts/run-tests.js",
+    "check": "node --check bin/tabkit.js && node --check src/cli.js && node scripts/run-tests.js",
+    "e2e": "node scripts/e2e.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d20260825613-hub/tabkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/d20260825613-hub/tabkit/issues"
+  },
+  "homepage": "https://github.com/d20260825613-hub/tabkit#readme",
+  "author": "d20260825613-hub",
+  "os": [
+    "win32",
+    "darwin",
+    "linux"
+  ]
+}

@@ -121,12 +121,23 @@ jobs:
           "$bin" --version
           "$bin" help > /dev/null
           printf 'id,name\n1,alice\n2,bob\n' > "$sandbox/data.csv"
-          "$bin" peek "$sandbox/data.csv" --json --quiet > "$sandbox/profile.json"
-          node -e "
-            const p = JSON.parse(require('fs').readFileSync('$sandbox/profile.json', 'utf8'));
-            if (p.rows !== 2) { console.error('installed peek wrong:', p.rows); process.exit(1); }
-            console.log('installed command works:', p.columns.length, 'columns');
+
+          # NOTE: no cross-tool file handoff here on purpose. `mktemp -d` is a
+          # bash path, and Node resolves the same string differently on Windows
+          # (bash writes /tmp/x, Node reads D:\tmp\x). Piping the output keeps
+          # every path inside one tool's world.
+          "$bin" peek "$sandbox/data.csv" --json --quiet | node -e "
+            let text = '';
+            process.stdin.on('data', (c) => (text += c)).on('end', () => {
+              const p = JSON.parse(text);
+              if (p.rows !== 2) { console.error('installed peek wrong:', p.rows); process.exit(1); }
+              console.log('installed peek works:', p.columns.length, 'columns');
+            });
           "
-          "$bin" query 'id > 1' "$sandbox/data.csv" --to csv --quiet | grep -q 'bob'
+
+          "$bin" query 'id > 1' "$sandbox/data.csv" --to csv --quiet | grep -q bob
           echo 'installed query works'
+
+          "$bin" convert "$sandbox/data.csv" --to markdown --quiet | grep -q '^| id | name |$'
+          echo 'installed convert works'
           rm -rf "$sandbox"

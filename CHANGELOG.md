@@ -4,7 +4,22 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-10-15
+
+### Fixed
+
+- **The CSV reader dropped rows whose fields were all empty.** The blank-line
+  test inspected the queued fields (`record.length === 1 && record[0] === ''`),
+  but one queued empty field is exactly what a delimiter leaves behind: a row
+  like `,` — two empty fields — was discarded outright and the row count came
+  back one short, with no warning and exit code 0. A blank line is now recognised
+  the only way it can be, by nothing at all having been read for that record, so
+  `skipEmptyLines` governs it and an explicitly quoted `""` is never swallowed.
+- **A bare CR broke JSONL.** CR is a line terminator — classic Mac endings, still
+  emitted by some tools — and the CSV reader has always accepted CR, LF and CRLF,
+  but the JSON side split on `\r?\n` alone: a CR-delimited JSONL file was read as
+  one enormous line and failed with "invalid JSON" instead of parsing. Format
+  detection and `parseJsonl` now use the same three-way split as CSV.
 
 ## [0.1.0] - 2026-09-27
 
@@ -76,5 +91,5 @@ Each was found by running the real CLI against real files; the tests now pin the
 - **A single-key wrapper object was unwrapped even with sibling keys**, which
   silently dropped the siblings. It only unwraps when the array is the only key.
 
-[Unreleased]: https://github.com/d20260825613-hub/tabkit/commits/main
+[0.1.1]: https://github.com/d20260825613-hub/tabkit/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/d20260825613-hub/tabkit/releases/tag/v0.1.0

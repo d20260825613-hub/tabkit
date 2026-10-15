@@ -11,6 +11,19 @@ test('detectFormat recognises the declared formats', () => {
   assert.equal(detectFormat('{"a": 1}\n{"a": 2}\n').format, 'jsonl');
 });
 
+test('parseJsonl accepts a bare CR as a line terminator', () => {
+  // Classic Mac line endings, still emitted by some tools. The CSV reader has
+  // always accepted CR, LF and CRLF; the JSON side split only on CRLF, so a
+  // CR-delimited JSONL file was read as one enormous line and threw
+  // "invalid JSON" instead of parsing.
+  const cr = '{"a":1}\r{"a":2}\r';
+  assert.equal(detectFormat(cr).format, 'jsonl');
+  const { rows } = parseJsonl(cr);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0], { a: 1 });
+  assert.deepEqual(rows[1], { a: 2 });
+});
+
 test('a semicolon-separated first line is detected with its delimiter', () => {
   const detected = detectFormat('a;b;c\n1;2;3\n');
   assert.equal(detected.format, 'csv');

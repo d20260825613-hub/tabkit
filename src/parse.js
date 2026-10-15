@@ -56,7 +56,7 @@ export function detectFormat(text, { filename = null } = {}) {
   }
 
   // Delimited: whichever of tab/comma/semicolon appears most in the first line
-  const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? '';
+  const firstLine = trimmed.split(/\r\n|\r|\n/, 1)[0] ?? '';
   const counts = {
     tsv: (firstLine.match(/\t/g) ?? []).length,
     csv: (firstLine.match(/,/g) ?? []).length,
@@ -66,7 +66,7 @@ export function detectFormat(text, { filename = null } = {}) {
   if (counts.semicolon > counts.csv && counts.semicolon > 0) {
     return { format: 'csv', delimiter: ';', reason: `${counts.semicolon} semicolon(s) on the first line` };
   }
-  const lines = trimmed.split(/\r?\n/).filter((l) => l.trim() !== '');
+  const lines = trimmed.split(/\r\n|\r|\n/).filter((l) => l.trim() !== '');
   if (lines.length > 1 && lines.every((l) => looksLikeJsonLine(l))) {
     return { format: 'jsonl', reason: 'every non-empty line parses as JSON' };
   }
@@ -143,7 +143,11 @@ export function rowsFromValues(values) {
 
 /** Parse JSON Lines: one JSON value per non-empty line. */
 export function parseJsonl(text, { maxRows = null, onError = 'throw' } = {}) {
-  const lines = String(text ?? '').split(/\r?\n/);
+  // A bare CR is a line terminator too (classic Mac line endings, and some
+  // tools still emit them). The CSV reader has always accepted all three; the
+  // JSON side only split on CRLF, so a CR-delimited JSONL file was sniffed as
+  // CSV and then produced garbage values instead of an error.
+  const lines = String(text ?? '').split(/\r\n|\r|\n/);
   const values = [];
   const errors = [];
   for (let i = 0; i < lines.length; i += 1) {

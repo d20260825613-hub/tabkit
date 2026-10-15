@@ -12,6 +12,34 @@ test('parseCsv reads a simple table with a header', () => {
   assert.deepEqual(errors, []);
 });
 
+test('parseCsv keeps a row whose fields are all empty', () => {
+  // A lone `,` is a row of two empty fields, not a blank line. It used to be
+  // dropped unconditionally: the blank-line test looked at the queued fields,
+  // and one queued empty field is exactly what a delimiter leaves behind.
+  const { rows } = parseCsv('a,b\n,\nc,d\n');
+  assert.equal(rows.length, 2, 'the empty row is data and must survive');
+  assert.deepEqual(rows[0], { a: '', b: '' });
+  assert.deepEqual(rows[1], { a: 'c', b: 'd' });
+});
+
+test('parseCsv still treats a genuinely blank line as blank', () => {
+  const { rows } = parseCsv('a,b\n\nc,d\n');
+  assert.equal(rows.length, 1, 'a blank line is skipped by default');
+
+  const kept = parseCsv('a,b\n\nc,d\n', { skipEmptyLines: false });
+  assert.equal(kept.rows.length, 2, 'and kept when the caller asks for it');
+  assert.deepEqual(kept.rows[0], { a: '', b: '' });
+  assert.deepEqual(kept.rows[1], { a: 'c', b: 'd' });
+});
+
+test('parseCsv keeps an explicitly quoted empty field', () => {
+  // `""` says "the value is empty on purpose"; it is not a blank line and must
+  // not be swallowed by skipEmptyLines.
+  const { rows } = parseCsv('a,b\n"",x\n');
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0], { a: '', b: 'x' });
+});
+
 test('a quoted field may contain the delimiter', () => {
   const { rows } = parseCsv('name,city\n"Smith, John",Berlin\n');
   assert.equal(rows[0].name, 'Smith, John');

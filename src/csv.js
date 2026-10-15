@@ -70,16 +70,21 @@ export function parseCsv(text, options = {}) {
   };
 
   const pushRecord = () => {
-    // A record with a single empty field is a blank line
-    if (record.length === 1 && record[0] === '' && field === '') {
+    // A blank line is a record that never started: no delimiter was seen, no
+    // quote opened, no character read. Deciding it from the queued fields
+    // instead — `record.length === 1 && record[0] === ''` — also matched a real
+    // row holding one empty field, so a lone `,` lost its second field and was
+    // dropped outright, even when the caller asked for blank lines to be kept.
+    if (record.length === 0 && field === '' && !fieldStarted) {
+      if (skipEmptyLines) {
+        record = [];
+        return;
+      }
+      records.push({ values: [''], line: recordStartLine });
       record = [];
       return;
     }
     pushField();
-    if (skipEmptyLines && record.length === 1 && (record[0] === '' || record[0] === null)) {
-      record = [];
-      return;
-    }
     records.push({ values: record, line: recordStartLine });
     record = [];
   };

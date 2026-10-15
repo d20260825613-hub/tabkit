@@ -197,7 +197,7 @@ const picked = table.rows.filter(expensive);
 ## 开发
 
 ```bash
-npm test      # 148 个用例，6 个文件
+npm test      # 152 个用例，6 个文件
 npm run e2e   # 30 项端到端检查，跑真实 CLI
 npm run check # 语法检查 + 测试
 ```

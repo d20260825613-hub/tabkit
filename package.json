@@ -1,6 +1,6 @@
 {
   "name": "tabkit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero-dependency CLI for the tables that pile up in real work: peek at a CSV's columns, convert between CSV/TSV/JSON/JSONL/Markdown, and filter rows with a small safe expression language.",
   "keywords": [
     "csv",
